@@ -1,5 +1,10 @@
 # Docker Drop 🐳
 
+[![CI](https://github.com/benstaniford/docker-drop/actions/workflows/ci.yml/badge.svg)](https://github.com/benstaniford/docker-drop/actions/workflows/ci.yml)
+[![Docker](https://github.com/benstaniford/docker-drop/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/benstaniford/docker-drop/actions/workflows/docker-publish.yml)
+[![Docker Hub](https://img.shields.io/docker/pulls/nerwander/docker-drop)](https://hub.docker.com/r/nerwander/docker-drop)
+[![Docker Image Size](https://img.shields.io/docker/image-size/nerwander/docker-drop/latest)](https://hub.docker.com/r/nerwander/docker-drop)
+
 A simple Flask web application that allows users to drag and drop text or images to store them in files. The application runs in a Docker container and saves files to a mapped external directory.
 
 ## Features
@@ -18,6 +23,30 @@ A simple Flask web application that allows users to drag and drop text or images
 - **Optional File Browser**: Browse stored files via web interface
 
 ## Quick Start
+
+### Using Pre-built Docker Image (Recommended)
+
+The easiest way to run Docker Drop is using the pre-built image from Docker Hub:
+
+```bash
+# Create output directory
+mkdir output
+
+# Run with Docker
+docker run -d \
+  --name docker-drop \
+  -p 5000:5000 \
+  -v $(pwd)/output:/output \
+  nerwander/docker-drop:latest
+
+# Or run with Docker Compose
+curl -o docker-compose.yml https://raw.githubusercontent.com/benstaniford/docker-drop/main/docker-compose.yml
+docker-compose up -d
+```
+
+### Building from Source
+
+If you want to build the image yourself:
 
 ### Prerequisites
 
