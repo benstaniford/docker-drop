@@ -3,7 +3,7 @@ version: '3.8'
 services:
   docker-drop:
     build: .
-    container_name: nerwander/docker-drop:latest
+    image: nerwander/docker-drop:latest
     ports:
       - "5082:5000"
     volumes:
@@ -12,7 +12,7 @@ services:
       - FLASK_ENV=production
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5082/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
