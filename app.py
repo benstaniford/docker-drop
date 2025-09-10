@@ -1,5 +1,6 @@
 import os
 import base64
+import logging
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
@@ -7,14 +8,39 @@ import uuid
 
 app = Flask(__name__)
 
-# Configuration
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # Console output
+        logging.FileHandler('app.log')  # File output
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Configuration - use local output directory in debug mode, /output in production
+def get_output_dir():
+    """Get the appropriate output directory based on environment"""
+    if app.debug or os.environ.get('FLASK_ENV') == 'development':
+        # In debug/development mode, use local output directory
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
+    else:
+        # In production (Docker), use /output
+        return '/output'
+
+# Initialize OUTPUT_DIR - will be updated in main if needed
 OUTPUT_DIR = '/output'
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'svg', 'webp'}
 
 def ensure_output_dir():
     """Ensure the output directory exists"""
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
+    output_dir = get_output_dir()
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        logger.info(f"Created output directory: {output_dir}")
+    else:
+        logger.info(f"Output directory exists: {output_dir}")
 
 def generate_filename(content_type, extension=None):
     """Generate a unique filename with timestamp"""
@@ -41,21 +67,28 @@ def index():
 def store_content():
     try:
         ensure_output_dir()
+        output_dir = get_output_dir()
         
         data = request.get_json()
         content_type = data.get('type')
         content = data.get('content')
         
+        logger.info(f"Received store request - Type: {content_type}, Content length: {len(content) if content else 0}")
+        
         if not content:
+            logger.warning("Store request failed: No content provided")
             return jsonify({'error': 'No content provided'}), 400
         
         if content_type == 'text':
             # Store text content
             filename = generate_filename('text')
-            filepath = os.path.join(OUTPUT_DIR, filename)
+            filepath = os.path.join(output_dir, filename)
             
             with open(filepath, 'w', encoding='utf-8') as f:
                 f.write(content)
+            
+            file_size = os.path.getsize(filepath)
+            logger.info(f"Successfully stored text file: {filepath} ({file_size} bytes)")
                 
             return jsonify({
                 'success': True, 
@@ -83,14 +116,19 @@ def store_content():
                 else:
                     extension = 'png'  # default
                 
+                logger.info(f"Processing image - Format: {extension}, Data size: {len(data_base64)} chars")
+                
                 # Decode base64 data
                 image_data = base64.b64decode(data_base64)
                 
                 filename = generate_filename('image', extension)
-                filepath = os.path.join(OUTPUT_DIR, filename)
+                filepath = os.path.join(output_dir, filename)
                 
                 with open(filepath, 'wb') as f:
                     f.write(image_data)
+                
+                file_size = os.path.getsize(filepath)
+                logger.info(f"Successfully stored image file: {filepath} ({file_size} bytes)")
                     
                 return jsonify({
                     'success': True, 
@@ -99,18 +137,26 @@ def store_content():
                 })
                 
             except Exception as e:
+                logger.error(f"Failed to process image: {str(e)}")
                 return jsonify({'error': f'Failed to process image: {str(e)}'}), 400
         
         else:
+            logger.warning(f"Store request failed: Invalid content type '{content_type}'")
             return jsonify({'error': 'Invalid content type'}), 400
             
     except Exception as e:
+        logger.error(f"Server error during store operation: {str(e)}")
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/health')
 def health_check():
+    logger.info("Health check requested")
     return jsonify({'status': 'healthy'})
 
 if __name__ == '__main__':
+    logger.info("Starting Docker Drop Flask application")
     ensure_output_dir()
+    output_dir = get_output_dir()
+    logger.info(f"Flask app starting on host=0.0.0.0, port=5000, debug=True")
+    logger.info(f"Output directory configured at: {output_dir}")
     app.run(host='0.0.0.0', port=5000, debug=True)

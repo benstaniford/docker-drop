@@ -3,6 +3,10 @@
 # Output directory (where dropped files are stored)
 output/
 
+# Application logs
+app.log
+*.log
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
