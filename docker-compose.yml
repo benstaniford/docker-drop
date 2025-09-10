@@ -3,7 +3,7 @@ version: '3.8'
 services:
   docker-drop:
     build: .
-    container_name: nerwander/docker-drop
+    container_name: nerwander/docker-drop:latest
     ports:
       - "5082:5000"
     volumes:
