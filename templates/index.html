@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker Drop - File Storage</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #5a67d8;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .drop-zone {
+            border: 3px dashed #5a67d8;
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            margin-bottom: 30px;
+            background: #f8f9ff;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            background: #e6edff;
+            border-color: #4c51bf;
+            transform: translateY(-2px);
+        }
+
+        .drop-zone-content {
+            pointer-events: none;
+        }
+
+        .drop-icon {
+            font-size: 4em;
+            color: #5a67d8;
+            margin-bottom: 20px;
+        }
+
+        .drop-text {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .drop-subtext {
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        .store-button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #5a67d8, #4c51bf);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .store-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(90, 103, 216, 0.3);
+        }
+
+        .store-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .preview {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            display: none;
+        }
+
+        .preview-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #5a67d8;
+        }
+
+        .preview-content {
+            max-height: 200px;
+            overflow-y: auto;
+            word-wrap: break-word;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 5px;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: center;
+            font-weight: 600;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #5a67d8;
+            font-weight: 600;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #5a67d8;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐳 Docker Drop</h1>
+            <p>Drag & drop text or images to store them safely</p>
+        </div>
+
+        <div class="drop-zone" id="dropZone">
+            <div class="drop-zone-content">
+                <div class="drop-icon">📁</div>
+                <div class="drop-text">Drop files here or click to select</div>
+                <div class="drop-subtext">Supports text and images (PNG, JPG, GIF, SVG, WebP)</div>
+            </div>
+        </div>
+
+        <input type="file" id="fileInput" class="file-input" accept="image/*,.txt">
+
+        <div class="preview" id="preview">
+            <div class="preview-title" id="previewTitle"></div>
+            <div class="preview-content" id="previewContent"></div>
+        </div>
+
+        <button class="store-button" id="storeButton" disabled>Store Content</button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div>Storing your content...</div>
+        </div>
+
+        <div class="message" id="message"></div>
+    </div>
+
+    <script>
+        let currentContent = null;
+        let currentType = null;
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const preview = document.getElementById('preview');
+        const previewTitle = document.getElementById('previewTitle');
+        const previewContent = document.getElementById('previewContent');
+        const storeButton = document.getElementById('storeButton');
+        const message = document.getElementById('message');
+        const loading = document.getElementById('loading');
+
+        // Click to select files
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // File input change handler
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        });
+
+        // Drag and drop handlers
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+
+            // Handle text drop
+            const text = e.dataTransfer.getData('text/plain');
+            if (text && text.trim()) {
+                handleText(text);
+                return;
+            }
+
+            // Handle file drop
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // Handle paste events for the entire document
+        document.addEventListener('paste', (e) => {
+            const clipboardData = e.clipboardData || window.clipboardData;
+            
+            // Handle pasted images
+            const items = clipboardData.items;
+            for (let item of items) {
+                if (item.type.indexOf('image') !== -1) {
+                    const file = item.getAsFile();
+                    handleFile(file);
+                    return;
+                }
+            }
+
+            // Handle pasted text
+            const text = clipboardData.getData('text/plain');
+            if (text && text.trim()) {
+                handleText(text);
+            }
+        });
+
+        function handleText(text) {
+            currentContent = text;
+            currentType = 'text';
+            
+            previewTitle.textContent = 'Text Content:';
+            previewContent.textContent = text;
+            preview.style.display = 'block';
+            storeButton.disabled = false;
+            hideMessage();
+        }
+
+        function handleFile(file) {
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    currentContent = e.target.result;
+                    currentType = 'image';
+                    
+                    previewTitle.textContent = `Image: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                    previewContent.innerHTML = `<img src="${e.target.result}" class="preview-image" alt="Preview">`;
+                    preview.style.display = 'block';
+                    storeButton.disabled = false;
+                    hideMessage();
+                };
+                reader.readAsDataURL(file);
+            } else if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    handleText(e.target.result);
+                };
+                reader.readAsText(file);
+            } else {
+                showMessage('Please select a valid text file or image.', 'error');
+            }
+        }
+
+        storeButton.addEventListener('click', async () => {
+            if (!currentContent || !currentType) {
+                showMessage('No content to store.', 'error');
+                return;
+            }
+
+            storeButton.disabled = true;
+            loading.style.display = 'block';
+            hideMessage();
+
+            try {
+                const response = await fetch('/store', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: currentType,
+                        content: currentContent
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(result.message, 'success');
+                    resetForm();
+                } else {
+                    showMessage(result.error || 'Failed to store content.', 'error');
+                    storeButton.disabled = false;
+                }
+            } catch (error) {
+                showMessage('Network error: ' + error.message, 'error');
+                storeButton.disabled = false;
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+
+        function showMessage(text, type) {
+            message.textContent = text;
+            message.className = `message ${type}`;
+            message.style.display = 'block';
+        }
+
+        function hideMessage() {
+            message.style.display = 'none';
+        }
+
+        function resetForm() {
+            currentContent = null;
+            currentType = null;
+            preview.style.display = 'none';
+            storeButton.disabled = true;
+            fileInput.value = '';
+        }
+    </script>
+</body>
+</html>

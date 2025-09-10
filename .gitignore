@@ -1,3 +1,8 @@
+# Docker Drop Application
+
+# Output directory (where dropped files are stored)
+output/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -48,6 +53,9 @@ coverage.xml
 *.cover
 *.py.cover
 .hypothesis/
+
+# Docker
+.env
 .pytest_cache/
 cover/
 
