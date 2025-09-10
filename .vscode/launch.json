@@ -14,8 +14,7 @@
                 "PYTHONPATH": "${workspaceFolder}"
             },
             "args": [],
-            "cwd": "${workspaceFolder}",
-            "preLaunchTask": "ensure-output-dir"
+            "cwd": "${workspaceFolder}"
         },
         {
             "name": "Python: Flask App (Production Mode)",
@@ -30,8 +29,7 @@
                 "PYTHONPATH": "${workspaceFolder}"
             },
             "args": [],
-            "cwd": "${workspaceFolder}",
-            "preLaunchTask": "ensure-output-dir"
+            "cwd": "${workspaceFolder}"
         },
         {
             "name": "Python: Current File",

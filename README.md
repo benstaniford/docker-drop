@@ -17,6 +17,7 @@ A simple Flask web application that allows users to drag and drop text or images
 - **File Support**: 
   - Text files (.txt)
   - Images (PNG, JPG, GIF, SVG, WebP, BMP)
+  - Email files (.msg, .eml) - Drag emails directly from Outlook!
 - **Unique Filenames**: Files are saved with timestamp and unique ID
 - **Dockerized**: Runs in a secure Docker container
 - **External Storage**: Files are saved to a mapped external directory
@@ -89,7 +90,8 @@ This will:
 
 1. Open http://localhost:5000 in your web browser
 2. **Drop content** in one of these ways:
-   - Drag and drop text or image files onto the drop zone
+   - Drag and drop text, image, or email files onto the drop zone
+   - **Drag emails directly from Outlook** (saves as .msg or .eml files)
    - Click the drop zone to select files
    - Copy text or images and paste them (Ctrl+V) anywhere on the page
 3. **Preview** your content in the preview area

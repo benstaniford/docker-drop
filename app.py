@@ -32,6 +32,12 @@ def get_output_dir():
 # Initialize OUTPUT_DIR - will be updated in main if needed
 OUTPUT_DIR = '/output'
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'svg', 'webp'}
+ALLOWED_EMAIL_EXTENSIONS = {'msg', 'eml'}
+EMAIL_MIME_TYPES = {
+    'message/rfc822',
+    'application/vnd.ms-outlook',
+    'application/octet-stream'  # Sometimes Outlook emails come as this
+}
 
 def ensure_output_dir():
     """Ensure the output directory exists"""
@@ -51,6 +57,8 @@ def generate_filename(content_type, extension=None):
         return f"{timestamp}_{unique_id}.{extension}"
     elif content_type == 'text':
         return f"{timestamp}_{unique_id}.txt"
+    elif content_type == 'email':
+        return f"{timestamp}_{unique_id}.msg"
     else:
         return f"{timestamp}_{unique_id}.bin"
 
@@ -58,6 +66,34 @@ def is_valid_image_extension(filename):
     """Check if the file has a valid image extension"""
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+
+def is_valid_email_extension(filename):
+    """Check if the file has a valid email extension"""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EMAIL_EXTENSIONS
+
+def detect_email_content(data):
+    """Detect if content appears to be an email"""
+    if isinstance(data, bytes):
+        try:
+            data_str = data.decode('utf-8', errors='ignore')
+        except:
+            return False
+    else:
+        data_str = str(data)
+    
+    # Check for common email headers
+    email_indicators = [
+        'From:', 'To:', 'Subject:', 'Date:',
+        'Return-Path:', 'Message-ID:', 'Content-Type:',
+        'Received:', 'MIME-Version:'
+    ]
+    
+    data_upper = data_str.upper()
+    email_header_count = sum(1 for indicator in email_indicators if indicator.upper() in data_upper)
+    
+    # If we find multiple email headers, it's likely an email
+    return email_header_count >= 3
 
 @app.route('/')
 def index():
@@ -139,6 +175,81 @@ def store_content():
             except Exception as e:
                 logger.error(f"Failed to process image: {str(e)}")
                 return jsonify({'error': f'Failed to process image: {str(e)}'}), 400
+        
+        elif content_type == 'email':
+            # Handle email content (from Outlook drag & drop)
+            try:
+                # Check if it's base64 encoded binary data (like .msg files)
+                if content.startswith('data:'):
+                    # Handle base64 encoded email files
+                    header, data_base64 = content.split(',', 1)
+                    email_data = base64.b64decode(data_base64)
+                    
+                    # Determine extension based on content or header
+                    if 'msg' in header.lower():
+                        extension = 'msg'
+                    elif 'eml' in header.lower():
+                        extension = 'eml'
+                    else:
+                        # Try to detect based on content
+                        if email_data.startswith(b'\xd0\xcf\x11\xe0'):  # OLE/MSG file signature
+                            extension = 'msg'
+                        else:
+                            extension = 'eml'
+                    
+                    filename = generate_filename('email', extension)
+                    filepath = os.path.join(output_dir, filename)
+                    
+                    with open(filepath, 'wb') as f:
+                        f.write(email_data)
+                        
+                    file_size = os.path.getsize(filepath)
+                    logger.info(f"Successfully stored email file: {filepath} ({file_size} bytes)")
+                    
+                    return jsonify({
+                        'success': True,
+                        'filename': filename,
+                        'message': f'Email saved as {filename}'
+                    })
+                    
+                else:
+                    # Handle plain text email content
+                    # Auto-detect if this looks like email content
+                    if detect_email_content(content):
+                        filename = generate_filename('email', 'eml')
+                        filepath = os.path.join(output_dir, filename)
+                        
+                        with open(filepath, 'w', encoding='utf-8') as f:
+                            f.write(content)
+                            
+                        file_size = os.path.getsize(filepath)
+                        logger.info(f"Successfully stored email text: {filepath} ({file_size} bytes)")
+                        
+                        return jsonify({
+                            'success': True,
+                            'filename': filename,
+                            'message': f'Email saved as {filename}'
+                        })
+                    else:
+                        # Treat as regular text if it doesn't look like an email
+                        filename = generate_filename('text')
+                        filepath = os.path.join(output_dir, filename)
+                        
+                        with open(filepath, 'w', encoding='utf-8') as f:
+                            f.write(content)
+                            
+                        file_size = os.path.getsize(filepath)
+                        logger.info(f"Successfully stored text content: {filepath} ({file_size} bytes)")
+                        
+                        return jsonify({
+                            'success': True,
+                            'filename': filename,
+                            'message': f'Text saved as {filename}'
+                        })
+                        
+            except Exception as e:
+                logger.error(f"Failed to process email: {str(e)}")
+                return jsonify({'error': f'Failed to process email: {str(e)}'}), 400
         
         else:
             logger.warning(f"Store request failed: Invalid content type '{content_type}'")
